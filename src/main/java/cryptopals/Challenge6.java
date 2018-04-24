@@ -1,5 +1,6 @@
 package cryptopals;
 
+import java.nio.charset.Charset;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.util.*;
@@ -11,71 +12,83 @@ public class Challenge6 {
         List<String> strings = Files.readAllLines(FileSystems.getDefault()
                 .getPath("/Users", "paulsanwald", "Desktop","6.txt"));
         String base64EncodedText = strings.stream().collect(Collectors.joining());
-        String encryptedText = new String(Base64.getDecoder().decode(base64EncodedText));
-
-        List<String> results = crackReapeatingKeyXOR(encryptedText, 2, 40);
-        System.out.println(results.toString());
+        byte[] encryptedText = Base64.getDecoder().decode(base64EncodedText);
+        String results = crackReapeatingKeyXOR(encryptedText, 2, 40);
+        System.out.println(results);
     }
 
-    public static List<String> crackReapeatingKeyXOR(String encryptedText, int minKeySize, int maxKeySize) {
+    public static String crackReapeatingKeyXOR(byte[] encryptedText, int minKeySize, int maxKeySize) {
         List<Tuple<Double, Integer>> guessedKeySize = guessKeySize(encryptedText, minKeySize, maxKeySize);
         Integer keySize = guessedKeySize.get(0).getRight();
-        List<String> splitText = splitCypherText(encryptedText, keySize);
-        List<String> transposedBlocks = transposeBlocks(splitText);
+        List<byte[]> splitText = splitCypherText(encryptedText, keySize);
+        List<byte[]> transposedBlocks = transposeBlocks(splitText);
 
-        TreeMap<Double, List<String>> scores = new TreeMap<>();
-        for (String block : transposedBlocks) {
-            scores = Challenge3.guessString(block, scores);
+        StringBuilder cipher = new StringBuilder();
+        for (byte[] block : transposedBlocks) {
+            String byteString = new String(block, Charset.forName("us-ascii"));
+            cipher.append(Challenge3.guessCipher(byteString));
         }
-        List<String> results = scores.lastEntry().getValue();
-        return results;
+        String result = cipher.toString();
+        return result;
     }
 
-    public static List<String> transposeBlocks(List<String> blocks) {
-        Map<Integer, StringBuilder> transposedBlocks = new HashMap<>();
-        for (String block : blocks) {
-            for (int index = 0; index < block.length(); index++) {
+    public static List<byte[]> transposeBlocks(List<byte[]> blocks) {
+        Map<Integer, List<Byte>> transposedBlocks = new HashMap<>();
+        for (byte[] block : blocks) {
+            for (int index = 0; index < block.length; index++) {
                 if (!transposedBlocks.containsKey(index)) {
-                    StringBuilder sb = new StringBuilder();
-                    sb.append(block.charAt(index));
-                    transposedBlocks.put(index, sb);
+                    List<Byte> list = new ArrayList();
+                    list.add(block[index]);
+                    transposedBlocks.put(index, list);
                 } else {
-                    transposedBlocks.get(index).append(block.charAt(index));
+                    transposedBlocks.get(index).add(block[index]);
                 }
             }
         }
-        List<String> toReturn = transposedBlocks.values().stream().map(
-                stringBuilder -> stringBuilder.toString()
-        ).collect(Collectors.toList());
+        List<byte[]> toReturn = new ArrayList<>();
+        for (List<Byte> arr : transposedBlocks.values()) {
+            byte[] bytes = toByteArray(arr);
+            toReturn.add(bytes);
+        }
         return toReturn;
     }
 
-    public static List<String> splitCypherText(String text, int splitBy) {
-        List<String> results = new ArrayList<>();
-        int buckets = (int)Math.ceil((double)text.length() / splitBy);
+    public static byte[] toByteArray(List<Byte> in) {
+        int n = in.size();
+        byte[] out = new byte[n];
+        for (int i = 0; i < n; i++) {
+            out[i] = in.get(i);
+        }
+        return out;
+    }
+
+    public static List<byte[]> splitCypherText(byte[] text, int splitBy) {
+        List<byte[]> results = new ArrayList<>();
+        int buckets = (int)Math.ceil((double)text.length / splitBy);
         int index = 0;
         for (int i = 0; i < buckets; i++) {
-            if (index+splitBy >= text.length()) {
-                results.add(text.substring(index, text.length()));
+            if (index+splitBy >= text.length) {
+                results.add(Arrays.copyOfRange(text, index, text.length));
             } else {
-                results.add(text.substring(index, index+splitBy));
+                results.add(Arrays.copyOfRange(text, index, index+splitBy));
             }
             index += splitBy;
         }
         return results;
     }
 
-    private static String stringToBinary(String s) {
-        StringBuilder result = new StringBuilder();
-        for (char c: s.toCharArray()) {
-            String paddedBinaryRepresentation = String.format("%16s", Integer.toBinaryString(c)).replace(' ', '0');
-            result.append(paddedBinaryRepresentation);
-        }
-        return result.toString();
+
+    public static String byteToString(byte[] byteArray) {
+       StringBuilder result = new StringBuilder();
+       for (byte b : byteArray) {
+           result.append(Integer.toBinaryString((b & 0xFF) + 0x100).substring(1));
+       }
+       return result.toString();
     }
-    public static int hammingDistance(String s1, String s2) {
-        String b1 = stringToBinary(s1);
-        String b2 = stringToBinary(s2);
+
+    public static int hammingDistance(byte[] first, byte[] second) {
+        String b1 = byteToString(first);
+        String b2 = byteToString(second);
 
         int hammingDistance = 0;
         for (int i = 0; i < b1.length(); i++) {
@@ -86,19 +99,29 @@ public class Challenge6 {
         return hammingDistance;
     }
 
-    public static double tryKeysize(int keysize, String ciphertext) {
-        String s1 = ciphertext.substring(0, keysize);
-        String s2 = ciphertext.substring(keysize, 2 * keysize);
-        return (double)hammingDistance(s1,s2) / keysize;
+    public static double tryKeysize(int keysize, byte[] ciphertext) {
+        byte[] b1 = Arrays.copyOfRange(ciphertext, 0, keysize);
+        byte[] b2 = Arrays.copyOfRange(ciphertext, keysize, 2*keysize);
+        byte[] b3 = Arrays.copyOfRange(ciphertext, keysize*2, 3*keysize);
+        byte[] b4 = Arrays.copyOfRange(ciphertext, keysize*3, 4*keysize);
+
+        double distanceAverage = ((double)(
+                hammingDistance(b1,b2)+
+                hammingDistance(b2,b3)+
+                hammingDistance(b3,b4)+
+                hammingDistance(b1,b4)+
+                hammingDistance(b1,b3)) / 5);
+        return distanceAverage / keysize;
     }
 
-    public static List<Tuple<Double, Integer>> guessKeySize(String cypherText, int minKeySize, int maxKeySize) {
+    public static List<Tuple<Double, Integer>> guessKeySize(byte[] cypherText, int minKeySize, int maxKeySize) {
         List<Tuple<Double, Integer>> results = new ArrayList<>();
         for (int keySize = minKeySize; keySize <= maxKeySize; keySize++) {
             results.add(new Tuple<>(tryKeysize(keySize, cypherText), keySize));
         }
-        return results.stream().sorted(
-                (o1, o2) -> o1.getLeft().compareTo(o2.getLeft())
+        List<Tuple<Double, Integer>> toReturn = results.stream().sorted(
+                Comparator.comparing(Tuple::getLeft)
         ).collect(Collectors.toList());
+        return toReturn;
     }
 }

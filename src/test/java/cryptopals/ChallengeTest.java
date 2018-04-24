@@ -46,13 +46,13 @@ public class ChallengeTest {
     public void testHammingDistance() {
         String s1 = "this is a test";
         String s2 = "wokka wokka!!!";
-        assertEquals(Challenge6.hammingDistance(s1,s2),37);
+        assertEquals(Challenge6.hammingDistance(s1.getBytes(),s2.getBytes()),37);
     }
 
     @Test
     public void testTryKeysize() {
-        double result = Challenge6.tryKeysize(2,"aabb");
-        assertEquals(2.0, result, 0.001);
+        double result = Challenge6.tryKeysize(2,"aabbccdd".getBytes());
+        assertEquals(1.8, result, 0.001);
     }
 
     @Test
@@ -64,30 +64,21 @@ public class ChallengeTest {
 
     @Test
     public void testTransposeBlocks() {
-        List<String> blocks = new ArrayList<>();
-        blocks.add("11");
-        blocks.add("22");
-        blocks.add("33");
-        blocks.add("44");
-        List<String> tranposed = Challenge6.transposeBlocks(blocks);
-        assertEquals("1234",tranposed.get(0));
-        assertEquals("1234",tranposed.get(1));
+        List<byte[]> blocks = new ArrayList<>();
+        blocks.add("11".getBytes());
+        blocks.add("22".getBytes());
+        blocks.add("33".getBytes());
+        blocks.add("44".getBytes());
+        List<byte[]> tranposed = Challenge6.transposeBlocks(blocks);
+        assertEquals(2,tranposed.size());
+        assertEquals(4,tranposed.get(1).length);
     }
 
     @Test
     public void testSplitCypherText() {
         String text = "123451234512345123";
-        List<String> split = Challenge6.splitCypherText(text, 5);
+        List<byte[]> split = Challenge6.splitCypherText(text.getBytes(), 5);
         assertEquals(4, split.size());
-    }
-    @Test
-    public void testCrackingRepeatingKeyXOR() {
-        String sourceText = "I have practiced piano every day for fifteen years. Could you please tell me again who your father is?";
-        String cipher = "ab";
-        String encryptedText = Challenge5.repeatingXOR(sourceText, cipher);
-        //String base64EncryptedText = Base64.getEncoder().encodeToString(encryptedText.getBytes());
-        List<String> decryptedText = Challenge6.crackReapeatingKeyXOR(encryptedText,2, 3);
-        assertEquals(sourceText, decryptedText.get(0));
     }
 
 }
