@@ -81,4 +81,11 @@ public class ChallengeTest {
         assertEquals(4, split.size());
     }
 
+    @Test
+    public void testPadBytes() {
+        String text = "YELLOW SUBMARINE";
+        byte[] result = Challenge9.padBytes(text.getBytes(),4);
+        assertEquals(result.length, text.length()+4);
+    }
+
 }
